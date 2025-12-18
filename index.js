@@ -23,6 +23,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/checkout", stripeRoutes);
 
+
 // Test route
 app.get("/", (req, res) => res.send("Backend is running"));
 
