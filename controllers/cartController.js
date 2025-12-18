@@ -1,63 +1,54 @@
 const db = require("../db");
 
-// Get user cart items
+// Get user cart
 const getCartItems = async(req, res) => {
     try {
-        const userId = req.user.id;
-        const result = await db.query(
-            `SELECT ci.id, p.id AS product_id, p.name, p.price, p.image_url, ci.quantity
-       FROM cart_items ci
-       JOIN products p ON ci.product_id = p.id
-       WHERE ci.user_id=$1`, [userId]
+        const [rows] = await db.query(
+            `SELECT c.id as cart_id, p.* , c.quantity 
+             FROM cart_items c
+             JOIN products p ON c.product_id = p.id
+             WHERE c.user_id = ?`, [req.user.id]
         );
-        res.json(result.rows);
+        res.json(rows);
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error" });
     }
 };
 
-// Add / update cart item
+// Add / update item in cart
 const addToCart = async(req, res) => {
+    const { product_id, quantity } = req.body;
     try {
-        const userId = req.user.id;
-        const { product_id, quantity } = req.body;
-
-        const exists = await db.query(
-            "SELECT * FROM cart_items WHERE user_id=$1 AND product_id=$2", [userId, product_id]
+        // Check if exists
+        const [existing] = await db.query(
+            "SELECT * FROM cart_items WHERE user_id=? AND product_id=?", [req.user.id, product_id]
         );
-
-        if (exists.rows.length > 0) {
-            // Update quantity
-            await db.query("UPDATE cart_items SET quantity=$1 WHERE id=$2", [
+        if (existing.length) {
+            await db.query("UPDATE cart_items SET quantity=? WHERE id=?", [
                 quantity,
-                exists.rows[0].id,
+                existing[0].id,
             ]);
         } else {
-            // Insert new item
             await db.query(
-                "INSERT INTO cart_items (user_id, product_id, quantity) VALUES ($1,$2,$3)", [userId, product_id, quantity]
+                "INSERT INTO cart_items (user_id, product_id, quantity) VALUES (?, ?, ?)", [req.user.id, product_id, quantity]
             );
         }
-
-        res.json({ message: "Cart updated successfully" });
+        res.json({ message: "Cart updated" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error" });
     }
 };
 
-// Remove item
+// Remove from cart
 const removeFromCart = async(req, res) => {
     try {
-        const userId = req.user.id;
-        const { cartItemId } = req.params;
-
-        await db.query("DELETE FROM cart_items WHERE id=$1 AND user_id=$2", [
-            cartItemId,
-            userId,
+        await db.query("DELETE FROM cart_items WHERE id=? AND user_id=?", [
+            req.params.cartItemId,
+            req.user.id,
         ]);
-        res.json({ message: "Item removed from cart" });
+        res.json({ message: "Item removed" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error" });

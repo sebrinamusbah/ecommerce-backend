@@ -7,17 +7,15 @@ const {
     updateProduct,
     deleteProduct,
 } = require("../controllers/productController");
-
-const authMiddleware = require("../middlewares/authMiddleware");
-const roleMiddleware = require("../middlewares/roleMiddleware");
+const { verifyToken, authorizeRole } = require("../middlewares/authMiddleware");
 
 // Public routes
 router.get("/", getProducts);
 router.get("/:id", getProductById);
 
 // Admin routes
-router.post("/", authMiddleware, roleMiddleware("admin"), createProduct);
-router.put("/:id", authMiddleware, roleMiddleware("admin"), updateProduct);
-router.delete("/:id", authMiddleware, roleMiddleware("admin"), deleteProduct);
+router.post("/", verifyToken, authorizeRole("admin"), createProduct);
+router.put("/:id", verifyToken, authorizeRole("admin"), updateProduct);
+router.delete("/:id", verifyToken, authorizeRole("admin"), deleteProduct);
 
 module.exports = router;

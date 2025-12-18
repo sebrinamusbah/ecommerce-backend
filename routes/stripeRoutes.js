@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { createCheckoutSession } = require("../controllers/stripeController");
-const authMiddleware = require("../middlewares/authMiddleware");
+const { verifyToken } = require("../middlewares/authMiddleware");
 
-router.post("/", authMiddleware, createCheckoutSession);
+// Protected
+router.post("/checkout", verifyToken, createCheckoutSession);
 
 module.exports = router;

@@ -3,42 +3,35 @@ const db = require("../db");
 // Create order from cart
 const createOrder = async(req, res) => {
     try {
-        const userId = req.user.id;
-
-        const cart = await db.query(
-            `SELECT ci.product_id, p.price, ci.quantity
-       FROM cart_items ci
-       JOIN products p ON ci.product_id = p.id
-       WHERE ci.user_id=$1`, [userId]
+        const [cartItems] = await db.query(
+            "SELECT c.product_id, c.quantity, p.price FROM cart_items c JOIN products p ON c.product_id=p.id WHERE c.user_id=?", [req.user.id]
         );
-
-        if (cart.rows.length === 0)
+        if (!cartItems.length)
             return res.status(400).json({ message: "Cart is empty" });
 
-        const total = cart.rows.reduce(
-            (acc, item) => acc + item.price * item.quantity,
+        // Calculate total
+        const total = cartItems.reduce(
+            (sum, item) => sum + item.price * item.quantity,
             0
         );
 
         // Insert order
-        const order = await db.query(
-            "INSERT INTO orders (user_id, total) VALUES ($1,$2) RETURNING *", [userId, total]
+        const [orderResult] = await db.query(
+            "INSERT INTO orders (user_id, total, status) VALUES (?, ?, 'pending')", [req.user.id, total]
         );
-
-        const orderId = order.rows[0].id;
+        const orderId = orderResult.insertId;
 
         // Insert order items
-        const promises = cart.rows.map((item) =>
-            db.query(
-                "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1,$2,$3,$4)", [orderId, item.product_id, item.quantity, item.price]
-            )
-        );
-        await Promise.all(promises);
+        for (let item of cartItems) {
+            await db.query(
+                "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)", [orderId, item.product_id, item.quantity, item.price]
+            );
+        }
 
         // Clear cart
-        await db.query("DELETE FROM cart_items WHERE user_id=$1", [userId]);
+        await db.query("DELETE FROM cart_items WHERE user_id=?", [req.user.id]);
 
-        res.status(201).json({ message: "Order created", order_id: orderId });
+        res.status(201).json({ message: "Order created", orderId });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error" });
@@ -48,15 +41,52 @@ const createOrder = async(req, res) => {
 // Get user orders
 const getUserOrders = async(req, res) => {
     try {
-        const userId = req.user.id;
-        const orders = await db.query(
-            "SELECT * FROM orders WHERE user_id=$1 ORDER BY created_at DESC", [userId]
-        );
-        res.json(orders.rows);
+        const [orders] = await db.query("SELECT * FROM orders WHERE user_id=?", [
+            req.user.id,
+        ]);
+        res.json(orders);
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error" });
     }
 };
 
-module.exports = { createOrder, getUserOrders };
+// Get order by ID
+const getOrderById = async(req, res) => {
+    try {
+        const [orders] = await db.query(
+            "SELECT * FROM orders WHERE id=? AND user_id=?", [req.params.id, req.user.id]
+        );
+        if (!orders.length)
+            return res.status(404).json({ message: "Order not found" });
+        const [items] = await db.query(
+            "SELECT * FROM order_items WHERE order_id=?", [req.params.id]
+        );
+        res.json({ order: orders[0], items });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+// Admin update order status
+const updateOrderStatus = async(req, res) => {
+    const { status } = req.body;
+    try {
+        await db.query("UPDATE orders SET status=? WHERE id=?", [
+            status,
+            req.params.id,
+        ]);
+        res.json({ message: "Order status updated" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+module.exports = {
+    createOrder,
+    getUserOrders,
+    getOrderById,
+    updateOrderStatus,
+};

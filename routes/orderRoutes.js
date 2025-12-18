@@ -3,12 +3,22 @@ const router = express.Router();
 const {
     createOrder,
     getUserOrders,
+    getOrderById,
+    updateOrderStatus,
 } = require("../controllers/orderController");
-const authMiddleware = require("../middlewares/authMiddleware");
+const { verifyToken, authorizeRole } = require("../middlewares/authMiddleware");
 
-router.use(authMiddleware);
+// User
+router.post("/", verifyToken, createOrder);
+router.get("/", verifyToken, getUserOrders);
+router.get("/:id", verifyToken, getOrderById);
 
-router.post("/", createOrder);
-router.get("/", getUserOrders);
+// Admin
+router.put(
+    "/:id/status",
+    verifyToken,
+    authorizeRole("admin"),
+    updateOrderStatus
+);
 
 module.exports = router;
