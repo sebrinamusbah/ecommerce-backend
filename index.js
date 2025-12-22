@@ -21,8 +21,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
-app.use("/api/checkout", stripeRoutes);
-
+app.use("/api/stripe", stripeRoutes);
 
 // Test route
 app.get("/", (req, res) => res.send("Backend is running"));
