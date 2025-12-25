@@ -21,7 +21,7 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(morgan("dev"));
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 
 // API Routes
 app.use("/api/auth", authRoutes);
@@ -32,9 +32,30 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 
-// Health check
+// Health check endpoint
 app.get("/api/health", (req, res) => {
-    res.json({ status: "OK", timestamp: new Date().toISOString() });
+    res.json({
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        service: "Bookstore API",
+    });
+});
+
+// Welcome route
+app.get("/", (req, res) => {
+    res.json({
+        message: "Welcome to Bookstore API",
+        version: "1.0.0",
+        endpoints: {
+            auth: "/api/auth",
+            books: "/api/books",
+            categories: "/api/categories",
+            cart: "/api/cart",
+            orders: "/api/orders",
+            users: "/api/users",
+            admin: "/api/admin",
+        },
+    });
 });
 
 // 404 handler

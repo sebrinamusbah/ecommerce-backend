@@ -1,27 +1,32 @@
 require("dotenv").config();
-const { connectDB } = require("./config/db");
 const app = require("./app");
+const { connectDB } = require("./config/db");
 const { port } = require("./config/serverConfig");
 
-// Connect to database
-connectDB();
-
-const server = app.listen(port, () => {
-    console.log(`Server running on port ${port} in ${process.env.NODE_ENV} mode`);
+// Database connection
+connectDB().then(() => {
+    // Start server
+    app.listen(port, () => {
+        console.log(`
+🚀 Server is running!
+📁 Environment: ${process.env.NODE_ENV}
+🌐 Port: ${port}
+🔗 URL: http://localhost:${port}
+📊 Database: ${process.env.DB_NAME}
+    
+📚 Bookstore API Endpoints:
+   GET  /              - API Documentation
+   GET  /api/health    - Health Check
+   POST /api/auth/register - Register User
+   POST /api/auth/login    - Login User
+   GET  /api/books     - Get All Books
+    `);
+    });
 });
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (err) => {
     console.log("UNHANDLED REJECTION! Shutting down...");
-    console.log(err.name, err.message);
-    server.close(() => {
-        process.exit(1);
-    });
-});
-
-// Handle uncaught exceptions
-process.on("uncaughtException", (err) => {
-    console.log("UNCAUGHT EXCEPTION! Shutting down...");
     console.log(err.name, err.message);
     process.exit(1);
 });
