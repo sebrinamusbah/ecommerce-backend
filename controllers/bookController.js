@@ -1,36 +1,15 @@
 const { Book, Category } = require("../models");
 const formatResponse = require("../utils/formatResponse");
 const { Op } = require("sequelize");
+const bookService = require("../services/bookService");
 
 // @desc    Get all books
 // @route   GET /api/books
 // @access  Public
 const getBooks = async(req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const offset = (page - 1) * limit;
-
-        const { count, rows } = await Book.findAndCountAll({
-            limit,
-            offset,
-            include: [Category],
-            order: [
-                ["createdAt", "DESC"]
-            ],
-        });
-
-        res.json(
-            formatResponse(
-                true, {
-                    books: rows,
-                    totalPages: Math.ceil(count / limit),
-                    currentPage: page,
-                    totalBooks: count,
-                },
-                "Books retrieved successfully"
-            )
-        );
+        const result = await bookService.getAllBooks(req.query);
+        res.json(formatResponse(true, result, "Books retrieved successfully"));
     } catch (error) {
         res.status(500).json(formatResponse(false, null, "Server error"));
     }
@@ -41,9 +20,7 @@ const getBooks = async(req, res) => {
 // @access  Public
 const getBookById = async(req, res) => {
     try {
-        const book = await Book.findByPk(req.params.id, {
-            include: [Category],
-        });
+        const book = await bookService.getBookById(req.params.id);
 
         if (!book) {
             return res
@@ -57,6 +34,7 @@ const getBookById = async(req, res) => {
     }
 };
 
+// ... rest of the controller
 // @desc    Create a book
 // @route   POST /api/books
 // @access  Private/Admin
