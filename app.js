@@ -8,12 +8,11 @@ const errorHandler = require("./middlewares/errorHandler");
 // Import routes
 const authRoutes = require("./routes/authRoutes");
 const bookRoutes = require("./routes/bookRoutes");
-const categoryRoutes = require("./routes/categoryRoutes");
-const cartRoutes = require("./routes/cartRoutes");
-const orderRoutes = require("./routes/orderRoutes");
+const categoryRoutes = require("./routes/categoryRoutes"); // Add this
+const cartRoutes = require("./routes/cartRoutes"); // Add this
+const orderRoutes = require("./routes/orderRoutes"); // Add this
 const userRoutes = require("./routes/userRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-
+const adminRoutes = require("./routes/adminRoutes"); // Add this
 const app = express();
 
 // Middleware
