@@ -7,7 +7,7 @@ const {
     removeCartItem,
     clearCart,
 } = require("../controllers/cartController");
-const { protect } = require("../middlewares/authMiddleware");
+const { protect } = require("../middlewares/auth");
 
 // All cart routes require authentication
 router.use(protect);

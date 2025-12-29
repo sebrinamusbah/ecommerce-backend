@@ -1,8 +1,15 @@
-const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/db");
+const { Model, DataTypes } = require("sequelize");
 
-const Book = sequelize.define(
-    "Book", {
+module.exports = (sequelize) => {
+    class Book extends Model {
+        static associate(models) {
+            // Define associations here
+            // Book.hasMany(models.Review, { foreignKey: 'bookId' });
+            // Book.hasMany(models.OrderItem, { foreignKey: 'bookId' });
+        }
+    }
+
+    Book.init({
         id: {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
@@ -64,8 +71,10 @@ const Book = sequelize.define(
             },
         },
     }, {
+        sequelize,
+        modelName: "Book",
         timestamps: true,
-    }
-);
+    });
 
-module.exports = Book;
+    return Book;
+};

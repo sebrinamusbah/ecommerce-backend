@@ -7,7 +7,7 @@ const {
     updateOrderStatus,
     getAllOrders,
 } = require("../controllers/orderController");
-const { protect, admin } = require("../middlewares/authMiddleware");
+const { protect, admin } = require("../middlewares/auth");
 
 // User routes
 router.use(protect);

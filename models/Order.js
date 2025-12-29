@@ -1,8 +1,16 @@
-const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/db");
+const { Model, DataTypes } = require("sequelize");
 
-const Order = sequelize.define(
-    "Order", {
+module.exports = (sequelize) => {
+    class Order extends Model {
+        static associate(models) {
+            // Define associations here
+            // Order.belongsTo(models.User, { foreignKey: 'userId' });
+            // Order.hasMany(models.OrderItem, { foreignKey: 'orderId' });
+            // Order.hasOne(models.Payment, { foreignKey: 'orderId' });
+        }
+    }
+
+    Order.init({
         id: {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
@@ -42,8 +50,10 @@ const Order = sequelize.define(
             type: DataTypes.TEXT,
         },
     }, {
+        sequelize,
+        modelName: "Order",
         timestamps: true,
-    }
-);
+    });
 
-module.exports = Order;
+    return Order;
+};

@@ -7,7 +7,7 @@ const {
     deleteUser,
     getDashboardStats,
 } = require("../controllers/adminController");
-const { protect, admin } = require("../middlewares/authMiddleware");
+const { protect, admin } = require("../middlewares/auth");
 
 // All admin routes require admin privileges
 router.use(protect);

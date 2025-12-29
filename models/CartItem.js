@@ -1,8 +1,15 @@
-const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/db");
+const { Model, DataTypes } = require("sequelize");
 
-const CartItem = sequelize.define(
-    "CartItem", {
+module.exports = (sequelize) => {
+    class CartItem extends Model {
+        static associate(models) {
+            // Define associations here
+            // CartItem.belongsTo(models.User, { foreignKey: 'userId' });
+            // CartItem.belongsTo(models.Book, { foreignKey: 'bookId' });
+        }
+    }
+
+    CartItem.init({
         id: {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
@@ -24,12 +31,15 @@ const CartItem = sequelize.define(
             },
         },
     }, {
+        sequelize,
+        modelName: "CartItem",
+        tableName: "cart_items", // Optional: explicit table name
         timestamps: true,
         indexes: [{
             unique: true,
             fields: ["userId", "bookId"],
         }, ],
-    }
-);
+    });
 
-module.exports = CartItem;
+    return CartItem;
+};

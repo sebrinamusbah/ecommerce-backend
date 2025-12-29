@@ -224,7 +224,8 @@ class OrderService {
         const totalOrders = await Order.count({
             where: {
                 createdAt: {
-                    [Op.gte]: startDate },
+                    [Op.gte]: startDate,
+                },
             },
         });
 
@@ -242,11 +243,12 @@ class OrderService {
             where: {
                 paymentStatus: "paid",
                 createdAt: {
-                    [Op.gte]: startDate },
+                    [Op.gte]: startDate,
+                },
             },
         });
 
-        const totalRevenue = revenueResult ? .dataValues ? .totalRevenue || 0;
+        const totalRevenue = revenueResult?.dataValues.totalRevenue || 0;
 
         // Orders by status
         const ordersByStatus = await Order.findAll({
@@ -258,7 +260,8 @@ class OrderService {
             ],
             where: {
                 createdAt: {
-                    [Op.gte]: startDate },
+                    [Op.gte]: startDate,
+                },
             },
             group: ["status"],
         });

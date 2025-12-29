@@ -1,109 +1,141 @@
-const { Book, Category } = require("../models");
-const formatResponse = require("../utils/formatResponse");
-const { Op } = require("sequelize");
-const bookService = require("../services/bookService");
+const db = require("../models");
+const Book = db.Book;
+const Category = db.Category;
 
-// @desc    Get all books
-// @route   GET /api/books
-// @access  Public
-const getBooks = async(req, res) => {
+// Get all books with pagination and filtering
+exports.getAllBooks = async(req, res) => {
     try {
-        const result = await bookService.getAllBooks(req.query);
-        res.json(formatResponse(true, result, "Books retrieved successfully"));
+        const {
+            page = 1,
+                limit = 10,
+                search,
+                category,
+                minPrice,
+                maxPrice,
+                sortBy = "createdAt",
+                order = "DESC",
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+
+        // Build where clause
+        const where = {};
+
+        if (search) {
+            where[db.Sequelize.Op.or] = [
+                { title: {
+                        [db.Sequelize.Op.iLike]: `%${search}%` } },
+                { author: {
+                        [db.Sequelize.Op.iLike]: `%${search}%` } },
+                { description: {
+                        [db.Sequelize.Op.iLike]: `%${search}%` } },
+            ];
+        }
+
+        if (category) {
+            where.categoryId = category;
+        }
+
+        if (minPrice || maxPrice) {
+            where.price = {};
+            if (minPrice) where.price[db.Sequelize.Op.gte] = parseFloat(minPrice);
+            if (maxPrice) where.price[db.Sequelize.Op.lte] = parseFloat(maxPrice);
+        }
+
+        // Get books with total count
+        const { count, rows: books } = await Book.findAndCountAll({
+            where,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [
+                [sortBy, order.toUpperCase()]
+            ],
+            include: [{
+                model: Category,
+                attributes: ["id", "name", "slug"],
+            }, ],
+        });
+
+        res.json({
+            total: count,
+            totalPages: Math.ceil(count / limit),
+            currentPage: parseInt(page),
+            books,
+        });
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        console.error("Get books error:", error);
+        res.status(500).json({ error: error.message });
     }
 };
 
-// @desc    Get single book
-// @route   GET /api/books/:id
-// @access  Public
-const getBookById = async(req, res) => {
+// Get single book by ID
+exports.getBookById = async(req, res) => {
     try {
-        const book = await bookService.getBookById(req.params.id);
+        const book = await Book.findByPk(req.params.id, {
+            include: [{
+                model: Category,
+                attributes: ["id", "name", "slug"],
+            }, ],
+        });
 
         if (!book) {
-            return res
-                .status(404)
-                .json(formatResponse(false, null, "Book not found"));
+            return res.status(404).json({ error: "Book not found" });
         }
 
-        res.json(formatResponse(true, book, "Book retrieved successfully"));
+        res.json(book);
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        res.status(500).json({ error: error.message });
     }
 };
 
-// ... rest of the controller
-// @desc    Create a book
-// @route   POST /api/books
-// @access  Private/Admin
-const createBook = async(req, res) => {
+// Create new book (admin only)
+exports.createBook = async(req, res) => {
     try {
         const book = await Book.create(req.body);
-
-        if (req.body.categories) {
-            await book.setCategories(req.body.categories);
-        }
-
-        res
-            .status(201)
-            .json(formatResponse(true, book, "Book created successfully"));
+        res.status(201).json({
+            message: "Book created successfully",
+            book,
+        });
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        res.status(400).json({ error: error.message });
     }
 };
 
-// @desc    Update a book
-// @route   PUT /api/books/:id
-// @access  Private/Admin
-const updateBook = async(req, res) => {
+// Update book (admin only)
+exports.updateBook = async(req, res) => {
     try {
         const book = await Book.findByPk(req.params.id);
 
         if (!book) {
-            return res
-                .status(404)
-                .json(formatResponse(false, null, "Book not found"));
+            return res.status(404).json({ error: "Book not found" });
         }
 
         await book.update(req.body);
 
-        if (req.body.categories) {
-            await book.setCategories(req.body.categories);
-        }
-
-        res.json(formatResponse(true, book, "Book updated successfully"));
+        res.json({
+            message: "Book updated successfully",
+            book,
+        });
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        res.status(400).json({ error: error.message });
     }
 };
 
-// @desc    Delete a book
-// @route   DELETE /api/books/:id
-// @access  Private/Admin
-const deleteBook = async(req, res) => {
+// Delete book (admin only)
+exports.deleteBook = async(req, res) => {
     try {
         const book = await Book.findByPk(req.params.id);
 
         if (!book) {
-            return res
-                .status(404)
-                .json(formatResponse(false, null, "Book not found"));
+            return res.status(404).json({ error: "Book not found" });
         }
 
         await book.destroy();
 
-        res.json(formatResponse(true, null, "Book deleted successfully"));
+        res.json({
+            message: "Book deleted successfully",
+        });
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        res.status(500).json({ error: error.message });
     }
-};
-
-module.exports = {
-    getBooks,
-    getBookById,
-    createBook,
-    updateBook,
-    deleteBook,
 };

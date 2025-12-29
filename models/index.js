@@ -1,39 +1,38 @@
-const User = require("./User");
-const Book = require("./Book");
-const Category = require("./Category");
-const Order = require("./Order");
-const OrderItem = require("./OrderItem");
-const CartItem = require("./CartItem");
+const { sequelize } = require("../config/db");
+const fs = require("fs");
+const path = require("path");
+const { DataTypes } = require("sequelize");
+const basename = path.basename(__filename);
 
-// Book & Category (Many-to-Many)
-Book.belongsToMany(Category, { through: "BookCategories" });
-Category.belongsToMany(Book, { through: "BookCategories" });
+const db = {};
 
-// User & Order (One-to-Many)
-User.hasMany(Order, { foreignKey: "userId", onDelete: "CASCADE" });
-Order.belongsTo(User, { foreignKey: "userId" });
+// Load all model files
+fs.readdirSync(__dirname)
+    .filter((file) => {
+        return (
+            file.indexOf(".") !== 0 && file !== basename && file.slice(-3) === ".js"
+        );
+    })
+    .forEach((file) => {
+        // Load the model function
+        const modelFunction = require(path.join(__dirname, file));
 
-// Order & OrderItem (One-to-Many)
-Order.hasMany(OrderItem, { foreignKey: "orderId", onDelete: "CASCADE" });
-OrderItem.belongsTo(Order, { foreignKey: "orderId" });
+        // Call the function with sequelize and DataTypes
+        const model = modelFunction(sequelize, DataTypes);
 
-// Book & OrderItem (Many-to-One)
-Book.hasMany(OrderItem, { foreignKey: "bookId" });
-OrderItem.belongsTo(Book, { foreignKey: "bookId" });
+        // Add to db object
+        db[model.name] = model;
+    });
 
-// User & CartItem (One-to-Many)
-User.hasMany(CartItem, { foreignKey: "userId", onDelete: "CASCADE" });
-CartItem.belongsTo(User, { foreignKey: "userId" });
+// Run associate methods if they exist
+Object.keys(db).forEach((modelName) => {
+    if (typeof db[modelName].associate === "function") {
+        db[modelName].associate(db);
+    }
+});
 
-// Book & CartItem (Many-to-One)
-Book.hasMany(CartItem, { foreignKey: "bookId", onDelete: "CASCADE" });
-CartItem.belongsTo(Book, { foreignKey: "bookId" });
+// Export the db object
+db.sequelize = sequelize;
+db.Sequelize = require("sequelize");
 
-module.exports = {
-    User,
-    Book,
-    Category,
-    Order,
-    OrderItem,
-    CartItem,
-};
+module.exports = db;

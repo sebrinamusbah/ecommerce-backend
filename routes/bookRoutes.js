@@ -1,21 +1,28 @@
 const express = require("express");
 const router = express.Router();
-const {
-    getBooks,
-    getBookById,
-    createBook,
-    updateBook,
-    deleteBook,
-} = require("../controllers/bookController");
-const { protect, admin } = require("../middlewares/authMiddleware");
+const bookController = require("../controllers/bookController");
+const { authenticate, isAdmin } = require("../middlewares/auth");
+const { validateBook } = require("../middlewares/validation");
 
 // Public routes
-router.get("/", getBooks);
-router.get("/:id", getBookById);
+router.get("/", bookController.getAllBooks);
+router.get("/:id", bookController.getBookById);
 
-// Protected admin routes
-router.post("/", protect, admin, createBook);
-router.put("/:id", protect, admin, updateBook);
-router.delete("/:id", protect, admin, deleteBook);
+// Protected routes (admin only)
+router.post(
+    "/",
+    authenticate,
+    isAdmin,
+    validateBook,
+    bookController.createBook
+);
+router.put(
+    "/:id",
+    authenticate,
+    isAdmin,
+    validateBook,
+    bookController.updateBook
+);
+router.delete("/:id", authenticate, isAdmin, bookController.deleteBook);
 
 module.exports = router;

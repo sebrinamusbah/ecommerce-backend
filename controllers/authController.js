@@ -1,105 +1,103 @@
-const { User } = require("../models");
-const generateToken = require("../utils/generateToken");
-const formatResponse = require("../utils/formatResponse");
+const db = require("../models");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
-const register = async(req, res) => {
+const User = db.User;
+
+// Register new user
+exports.register = async(req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, role } = req.body;
 
-        // Check if user exists
-        const userExists = await User.findOne({ where: { email } });
-        if (userExists) {
-            return res
-                .status(400)
-                .json(formatResponse(false, null, "User already exists"));
+        // Check if user already exists
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ error: "User already exists" });
         }
 
-        // Create user
+        // Create new user
         const user = await User.create({
             name,
             email,
-            password,
+            password, // Will be hashed by the model hook
+            role: role || "user",
         });
 
-        // Generate token
-        const token = generateToken(user.id);
-
-        res.status(201).json(
-            formatResponse(
-                true, {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                    token,
-                },
-                "Registration successful"
-            )
+        // Generate JWT token
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role },
+            process.env.JWT_SECRET || "your-secret-key", { expiresIn: "24h" }
         );
+
+        // Remove password from response
+        const userResponse = user.toJSON();
+        delete userResponse.password;
+
+        res.status(201).json({
+            message: "User registered successfully",
+            user: userResponse,
+            token,
+        });
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        console.error("Registration error:", error);
+        res.status(500).json({ error: error.message });
     }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-const login = async(req, res) => {
+// Login user
+exports.login = async(req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Check for user
+        // Find user
         const user = await User.findOne({ where: { email } });
         if (!user) {
-            return res
-                .status(401)
-                .json(formatResponse(false, null, "Invalid credentials"));
+            return res.status(401).json({ error: "Invalid credentials" });
         }
 
         // Check password
-        const isMatch = await user.comparePassword(password);
-        if (!isMatch) {
-            return res
-                .status(401)
-                .json(formatResponse(false, null, "Invalid credentials"));
+        const isValidPassword = await user.comparePassword(password);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: "Invalid credentials" });
         }
 
-        // Generate token
-        const token = generateToken(user.id);
+        // Check if user is active
+        if (!user.isActive) {
+            return res.status(403).json({ error: "Account is deactivated" });
+        }
 
-        res.json(
-            formatResponse(
-                true, {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                    token,
-                },
-                "Login successful"
-            )
+        // Generate JWT token
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role },
+            process.env.JWT_SECRET || "your-secret-key", { expiresIn: "24h" }
         );
+
+        // Remove password from response
+        const userResponse = user.toJSON();
+        delete userResponse.password;
+
+        res.json({
+            message: "Login successful",
+            user: userResponse,
+            token,
+        });
     } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
+        console.error("Login error:", error);
+        res.status(500).json({ error: error.message });
     }
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = async(req, res) => {
+// Get current user profile
+exports.getProfile = async(req, res) => {
     try {
-        res.json(formatResponse(true, req.user, "User data retrieved"));
-    } catch (error) {
-        res.status(500).json(formatResponse(false, null, "Server error"));
-    }
-};
+        const user = await User.findByPk(req.user.id, {
+            attributes: { exclude: ["password"] },
+        });
 
-module.exports = {
-    register,
-    login,
-    getMe,
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };

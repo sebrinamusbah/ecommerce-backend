@@ -1,9 +1,21 @@
-const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/db");
+// models/User.js
+const { Model, DataTypes } = require("sequelize");
 const bcrypt = require("bcryptjs");
 
-const User = sequelize.define(
-    "User", {
+module.exports = (sequelize) => {
+    class User extends Model {
+        async comparePassword(password) {
+            return await bcrypt.compare(password, this.password);
+        }
+
+        static associate(models) {
+            // Define associations here
+            // User.hasMany(models.Order, { foreignKey: 'userId' });
+            // User.hasMany(models.Review, { foreignKey: 'userId' });
+        }
+    }
+
+    User.init({
         id: {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
@@ -43,6 +55,8 @@ const User = sequelize.define(
             defaultValue: true,
         },
     }, {
+        sequelize,
+        modelName: "User",
         timestamps: true,
         hooks: {
             beforeCreate: async(user) => {
@@ -51,12 +65,14 @@ const User = sequelize.define(
                     user.password = await bcrypt.hash(user.password, salt);
                 }
             },
+            beforeUpdate: async(user) => {
+                if (user.changed("password") && user.password) {
+                    const salt = await bcrypt.genSalt(10);
+                    user.password = await bcrypt.hash(user.password, salt);
+                }
+            },
         },
-    }
-);
+    });
 
-User.prototype.comparePassword = async function(password) {
-    return await bcrypt.compare(password, this.password);
+    return User;
 };
-
-module.exports = User;
