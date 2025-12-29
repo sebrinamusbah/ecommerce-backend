@@ -43,5 +43,12 @@
         "nodemon": "^3.1.11",
         "sequelize-cli": "^6.6.3",
         "supertest": "^7.1.4"
+    },
+
+    "jest": {
+        "testEnvironment": "node",
+        "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+        "globalTeardown": "<rootDir>/tests/teardown.js"
+
     }
 }

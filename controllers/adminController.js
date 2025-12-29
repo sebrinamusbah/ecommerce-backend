@@ -168,7 +168,7 @@ const getDashboardStats = async(req, res) => {
             },
         });
 
-        const totalRevenue = revenueResult ? .dataValues ? .totalRevenue || 0;
+        const totalRevenue = revenueResult?.dataValues?.totalRevenue || 0;
 
         res.json(
             formatResponse(
