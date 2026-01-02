@@ -1,271 +1,240 @@
-// server.js - Fixed version
-const express = require("express");
-const cors = require("cors");
-const morgan = require("morgan");
-const fs = require("fs"); // Add this line!
-const path = require("path"); // Add this line!
-require("dotenv").config();
+// server.js
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const dotenv = require('dotenv');
+const path = require('path');
 
+// Load environment variables
+dotenv.config();
+
+// Import security middleware
+const {
+    securityHeaders,
+    customSecurity,
+    generalLimiter
+} = require('./middleware/securityMiddleware');
+
+// Import database connection
+const { sequelize } = require('./config/db');
+
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const bookRoutes = require('./routes/bookRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+
+// Initialize Express app
 const app = express();
 
-// Database connection (optional for now)
-let db;
-try {
-    db = require("./models");
-    db.sequelize
-        .authenticate()
-        .then(() => console.log("✅ Database connected"))
-        .catch((err) =>
-            console.log(
-                "⚠️  Database connection issue (continuing without DB):",
-                err.message
-            )
-        );
-} catch (error) {
-    console.log("⚠️  Models not loaded (continuing without DB)");
-}
+// ========================
+// SECURITY MIDDLEWARE
+// ========================
 
-// Middleware
-app.use(cors());
-app.use(morgan("dev"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 1. Security headers (Helmet)
+app.use(securityHeaders);
 
-// Health check
-app.get("/api/health", (req, res) => {
+// 2. Custom security headers
+app.use(customSecurity);
+
+// 3. Rate limiting for all routes
+app.use(generalLimiter);
+
+// ========================
+// BASIC MIDDLEWARE
+// ========================
+
+// 4. CORS configuration
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' ?
+        process.env.CORS_ORIGIN ?.split(',') || ['https://yourdomain.com'] : ['http://localhost:3000', 'http://localhost:5173'], // React/Vite dev servers
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// 5. Request logging
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// 6. Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 7. Static files (if you have public folder)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ========================
+// DATABASE CONNECTION
+// ========================
+
+// Test database connection
+const testDatabaseConnection = async() => {
+    try {
+        await sequelize.authenticate();
+        console.log('✅ Database connection established successfully.');
+
+        // Sync models (use with caution in production)
+        if (process.env.NODE_ENV === 'development') {
+            // await sequelize.sync({ alter: true });
+            console.log('📊 Database models are ready.');
+        }
+    } catch (error) {
+        console.error('❌ Unable to connect to the database:', error.message);
+        console.error('🔧 Check your DATABASE_URL in .env file');
+        process.exit(1);
+    }
+};
+
+// ========================
+// ROUTES
+// ========================
+
+// 8. Health check endpoint
+app.get('/api/health', (req, res) => {
     res.json({
-        status: "OK",
+        success: true,
+        message: 'Bookstore API is running 🚀',
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || "development",
+        environment: process.env.NODE_ENV || 'development',
+        version: '1.0.0'
     });
 });
 
-// Fix middleware imports by creating simple middleware
-const simpleAuth = {
-    authenticate: (req, res, next) => {
-        req.user = { id: "temp-id", role: "user" };
-        next();
-    },
-    isAdmin: (req, res, next) => {
-        if (req.user?.role !== "admin") {
-            return res.status(403).json({ error: "Admin access required" });
-        }
-        next();
-    },
-};
+// 9. API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/books', bookRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/reviews', reviewRoutes);
 
-const simpleValidation = {
-    validateRegister: (req, res, next) => {
-        const { name, email, password } = req.body;
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: "Missing required fields" });
-        }
-        next();
-    },
-    validateLogin: (req, res, next) => {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email and password required" });
-        }
-        next();
-    },
-};
-
-// Load routes manually to avoid errors
-try {
-    // Auth routes
-    const authRouter = express.Router();
-    authRouter.post(
-        "/register",
-        simpleValidation.validateRegister,
-        (req, res) => {
-            res.json({
-                success: true,
-                message: "Registration successful",
-                user: { id: "temp", name: req.body.name, email: req.body.email },
-            });
-        }
-    );
-    authRouter.post("/login", simpleValidation.validateLogin, (req, res) => {
-        res.json({
-            success: true,
-            message: "Login successful",
-            token: "temp-jwt-token",
-            user: { id: "temp", name: "Test User", email: req.body.email },
-        });
-    });
-    authRouter.get("/profile", simpleAuth.authenticate, (req, res) => {
-        res.json({ success: true, user: req.user });
-    });
-    app.use("/api/auth", authRouter);
-    console.log("✅ Loaded auth routes");
-} catch (error) {
-    console.log("⚠️  Could not load auth routes:", error.message);
-}
-
-// Book routes
-try {
-    const bookRouter = express.Router();
-    bookRouter.get("/", async(req, res) => {
-        try {
-            const db = require("./models");
-            const books = await db.Book.findAll({ limit: 10 });
-            res.json({ success: true, books });
-        } catch (error) {
-            res.json({
-                success: true,
-                books: [
-                    { id: 1, title: "Sample Book 1", author: "Author 1", price: 19.99 },
-                    { id: 2, title: "Sample Book 2", author: "Author 2", price: 24.99 },
-                ],
-            });
-        }
-    });
-
-    bookRouter.get("/:id", (req, res) => {
-        res.json({
-            success: true,
-            book: {
-                id: req.params.id,
-                title: "Sample Book",
-                author: "Author Name",
-                price: 19.99,
-            },
-        });
-    });
-
-    app.use("/api/books", bookRouter);
-    console.log("✅ Loaded book routes");
-} catch (error) {
-    console.log("⚠️  Could not load book routes:", error.message);
-}
-
-// Category routes
-try {
-    const categoryRouter = express.Router();
-    categoryRouter.get("/", (req, res) => {
-        res.json({
-            success: true,
-            categories: [
-                { id: 1, name: "Fiction", slug: "fiction" },
-                { id: 2, name: "Non-Fiction", slug: "non-fiction" },
-            ],
-        });
-    });
-    app.use("/api/categories", categoryRouter);
-    console.log("✅ Loaded category routes");
-} catch (error) {
-    console.log("⚠️  Could not load category routes:", error.message);
-}
-
-// Order routes
-try {
-    const orderRouter = express.Router();
-    orderRouter.get("/", simpleAuth.authenticate, (req, res) => {
-        res.json({
-            success: true,
-            orders: [
-                { id: 1, total: 49.98, status: "completed" },
-                { id: 2, total: 29.99, status: "processing" },
-            ],
-        });
-    });
-    app.use("/api/orders", orderRouter);
-    console.log("✅ Loaded order routes");
-} catch (error) {
-    console.log("⚠️  Could not load order routes:", error.message);
-}
-
-// User routes (admin only)
-try {
-    const userRouter = express.Router();
-    userRouter.get(
-        "/",
-        simpleAuth.authenticate,
-        simpleAuth.isAdmin,
-        (req, res) => {
-            res.json({
-                success: true,
-                users: [{
-                        id: 1,
-                        name: "Admin User",
-                        email: "admin@example.com",
-                        role: "admin",
-                    },
-                    {
-                        id: 2,
-                        name: "Regular User",
-                        email: "user@example.com",
-                        role: "user",
-                    },
-                ],
-            });
-        }
-    );
-    app.use("/api/users", userRouter);
-    console.log("✅ Loaded user routes");
-} catch (error) {
-    console.log("⚠️  Could not load user routes:", error.message);
-}
-
-// API Documentation
-app.get("/", (req, res) => {
+// 10. Welcome route
+app.get('/', (req, res) => {
     res.json({
-        message: "📚 Readify Bookstore API",
-        version: "1.0.0",
-        status: "Running",
+        success: true,
+        message: 'Welcome to Readify Bookstore API 📚',
+        documentation: 'Visit /api/health for API status',
         endpoints: {
-            health: "GET /api/health",
-            auth: {
-                register: "POST /api/auth/register",
-                login: "POST /api/auth/login",
-                profile: "GET /api/auth/profile",
-            },
-            books: {
-                list: "GET /api/books",
-                single: "GET /api/books/:id",
-            },
-            categories: "GET /api/categories",
-            orders: "GET /api/orders",
-            users: "GET /api/users (admin)",
-        },
+            auth: '/api/auth',
+            books: '/api/books',
+            admin: '/api/admin',
+            cart: '/api/cart',
+            orders: '/api/orders',
+            payments: '/api/payments'
+        }
     });
 });
 
-// 404 handler
-app.use((req, res) => {
+// ========================
+// ERROR HANDLING
+// ========================
+
+// 11. 404 Not Found handler
+app.use('*', (req, res) => {
     res.status(404).json({
         success: false,
-        error: "Endpoint not found",
+        error: `Cannot ${req.method} ${req.originalUrl}`
     });
 });
 
-// Error handler
+// 12. Global error handler
 app.use((err, req, res, next) => {
-    console.error("Server error:", err);
-    res.status(500).json({
+    console.error('[ERROR]', err.stack);
+
+    const statusCode = err.statusCode || 500;
+    const message = process.env.NODE_ENV === 'production' ?
+        'Something went wrong. Please try again later.' :
+        err.message;
+
+    res.status(statusCode).json({
         success: false,
-        error: "Internal server error",
-        message: process.env.NODE_ENV === "development" ? err.message : undefined,
+        error: message,
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 });
 
-const PORT = process.env.PORT || 5001;
+// ========================
+// SERVER STARTUP
+// ========================
 
-app.listen(PORT, () => {
-    console.log("\n🚀 Server is running!");
-    console.log(`📁 Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(`🌐 Port: ${PORT}`);
-    console.log(`🔗 URL: http://localhost:${PORT}`);
-    console.log("\n📚 Available Endpoints:");
-    console.log("   GET  /              - API Documentation");
-    console.log("   GET  /api/health    - Health Check");
-    console.log("   POST /api/auth/register - Register User");
-    console.log("   POST /api/auth/login    - Login User");
-    console.log("   GET  /api/auth/profile  - User Profile");
-    console.log("   GET  /api/books     - Get All Books");
-    console.log("   GET  /api/books/:id - Get Book by ID");
-    console.log("   GET  /api/categories - Get Categories");
-    console.log("   GET  /api/orders    - Get Orders");
-    console.log("   GET  /api/users     - Get Users (Admin)");
+const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0';
+
+// Start server after database connection
+const startServer = async() => {
+    try {
+        // Test database connection
+        await testDatabaseConnection();
+
+        // Start server
+        app.listen(PORT, HOST, () => {
+            console.log(`
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                 READIFY BOOKSTORE API                                        ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ 🔗 Server:  http://${HOST}:${PORT}                                           ║
+║ 🌱 Environment: ${process.env.NODE_ENV || 'development'}                     ║
+║ 🗄️  Database: ${sequelize.config.database}                                  ║
+║ 📁 Schema: project2                                                          ║
+║ ✅ Status: Ready                                                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+            `);
+
+            console.log('\n📦 Available Endpoints:');
+            console.log('   🔐 Auth:    POST /api/auth/register');
+            console.log('   🔐 Auth:    POST /api/auth/login');
+            console.log('   🏥 Health:  GET  /api/health');
+            console.log('   📚 Books:   GET  /api/books');
+            console.log('   🛒 Cart:    GET  /api/cart');
+            console.log('   📦 Orders:  GET  /api/orders');
+            console.log('   💳 Payments:GET  /api/payments');
+            console.log('\n🛡️  Security Features:');
+            console.log('   ✅ Rate Limiting');
+            console.log('   ✅ CORS Protection');
+            console.log('   ✅ Security Headers');
+            console.log('   ✅ Input Validation');
+            console.log('\n💡 Tip: Use /api/health to check API status');
+        });
+
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
+};
+
+// Handle graceful shutdown
+process.on('SIGTERM', async() => {
+    console.log('🛑 SIGTERM received. Shutting down gracefully...');
+    await sequelize.close();
+    console.log('✅ Database connection closed.');
+    process.exit(0);
 });
+
+process.on('SIGINT', async() => {
+    console.log('🛑 SIGINT received. Shutting down gracefully...');
+    await sequelize.close();
+    console.log('✅ Database connection closed.');
+    process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('💥 Uncaught Exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
+// Start the server
+startServer();
+
+module.exports = app; // For testing

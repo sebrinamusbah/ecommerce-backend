@@ -1,45 +1,67 @@
 const { Model, DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-    class CartItem extends Model {
-        static associate(models) {
-            // Define associations here
-            // CartItem.belongsTo(models.User, { foreignKey: 'userId' });
-            // CartItem.belongsTo(models.Book, { foreignKey: 'bookId' });
-        }
+  class CartItem extends Model {
+    static associate(models) {
+      // CartItem belongs to a User
+      CartItem.belongsTo(models.User, {
+        foreignKey: "userId",
+        as: "user",
+      });
+
+      // CartItem belongs to a Book
+      CartItem.belongsTo(models.Book, {
+        foreignKey: "bookId",
+        as: "book",
+      });
     }
+  }
 
-    CartItem.init({
-        id: {
-            type: DataTypes.UUID,
-            defaultValue: DataTypes.UUIDV4,
-            primaryKey: true,
+  CartItem.init(
+    {
+      id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+      },
+      userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: "Users",
+          key: "id",
         },
-        userId: {
-            type: DataTypes.UUID,
-            allowNull: false,
+      },
+      bookId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: "Books",
+          key: "id",
         },
-        bookId: {
-            type: DataTypes.UUID,
-            allowNull: false,
+      },
+      quantity: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1,
+        validate: {
+          min: 1,
         },
-        quantity: {
-            type: DataTypes.INTEGER,
-            defaultValue: 1,
-            validate: {
-                min: 1,
-            },
+      },
+    },
+    {
+      sequelize,
+      modelName: "CartItem",
+      schema: "project2", // 👈 Add schema for CartItem
+      tableName: "cart_items",
+      timestamps: true,
+      indexes: [
+        {
+          unique: true,
+          fields: ["userId", "bookId"],
         },
-    }, {
-        sequelize,
-        modelName: "CartItem",
-        tableName: "cart_items", // Optional: explicit table name
-        timestamps: true,
-        indexes: [{
-            unique: true,
-            fields: ["userId", "bookId"],
-        }, ],
-    });
+      ],
+    },
+  );
 
-    return CartItem;
+  return CartItem;
 };

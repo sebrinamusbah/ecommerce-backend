@@ -8,27 +8,22 @@ const db = {};
 
 // Load all model files
 fs.readdirSync(__dirname)
-    .filter((file) => {
-        return (
-            file.indexOf(".") !== 0 && file !== basename && file.slice(-3) === ".js"
-        );
-    })
-    .forEach((file) => {
-        // Load the model function
-        const modelFunction = require(path.join(__dirname, file));
-
-        // Call the function with sequelize and DataTypes
-        const model = modelFunction(sequelize, DataTypes);
-
-        // Add to db object
-        db[model.name] = model;
-    });
+  .filter((file) => {
+    return (
+      file.indexOf(".") !== 0 && file !== basename && file.slice(-3) === ".js"
+    );
+  })
+  .forEach((file) => {
+    const modelFunction = require(path.join(__dirname, file));
+    const model = modelFunction(sequelize, DataTypes);
+    db[model.name] = model;
+  });
 
 // Run associate methods if they exist
 Object.keys(db).forEach((modelName) => {
-    if (typeof db[modelName].associate === "function") {
-        db[modelName].associate(db);
-    }
+  if (typeof db[modelName].associate === "function") {
+    db[modelName].associate(db);
+  }
 });
 
 // Export the db object

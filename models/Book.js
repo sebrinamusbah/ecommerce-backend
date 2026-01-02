@@ -8,8 +8,28 @@ module.exports = (sequelize) => {
         foreignKey: "categoryId",
         as: "category",
       });
-      // Book.hasMany(models.Review, { foreignKey: 'bookId' });
-      // Book.hasMany(models.OrderItem, { foreignKey: 'bookId' });
+
+      // Book has many order items
+      Book.hasMany(models.OrderItem, {
+        foreignKey: "bookId",
+        as: "orderItems",
+      });
+
+      // Book has many cart items
+      Book.hasMany(models.CartItem, {
+        foreignKey: "bookId",
+        as: "cartItems",
+      });
+      Book.hasMany(models.Review, {
+        foreignKey: "bookId",
+        as: "reviews",
+      });
+
+      // Uncomment when you add Review.js
+      // Book.hasMany(models.Review, {
+      //   foreignKey: 'bookId',
+      //   as: 'reviews'
+      // });
     }
   }
 
@@ -49,9 +69,14 @@ module.exports = (sequelize) => {
           min: 0,
         },
       },
+      // In Book.js model
       coverImage: {
         type: DataTypes.STRING,
-        defaultValue: "default-book.jpg",
+        defaultValue:
+          "https://via.placeholder.com/300x400/4A90E2/FFFFFF?text=Book+Cover",
+        validate: {
+          isUrl: true, // Validates it's a proper URL
+        },
       },
       publishedDate: {
         type: DataTypes.DATE,
@@ -75,7 +100,6 @@ module.exports = (sequelize) => {
           max: 5,
         },
       },
-      // ADD THIS FIELD
       categoryId: {
         type: DataTypes.UUID,
         references: {
@@ -88,8 +112,10 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: "Book",
+      schema: "project2",
+      tableName: "Books",
       timestamps: true,
-    }
+    },
   );
 
   return Book;

@@ -1,201 +1,288 @@
-const { User, Book, Order, Category } = require("../models");
-const formatResponse = require("../utils/formatResponse");
+const adminService = require("../services/adminService");
 
-// @desc    Get all users
-// @route   GET /api/admin/users
-// @access  Private/Admin
-const getAllUsers = async(req, res) => {
-    try {
-        const users = await User.findAll({
-            attributes: { exclude: ["password"] },
-            order: [
-                ["createdAt", "DESC"]
-            ],
-        });
+// ==================== BOOK MANAGEMENT ====================
 
-        res.json(formatResponse(true, users, "Users retrieved successfully"));
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(formatResponse(false, null, "Server error"));
-    }
+/**
+ * Add new book (Admin only)
+ * @route POST /api/admin/books
+ * @access Private/Admin
+ */
+exports.addBook = async (req, res) => {
+  try {
+    const book = await adminService.addBook(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Book added successfully",
+      data: book,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
-// @desc    Get user by ID
-// @route   GET /api/admin/users/:id
-// @access  Private/Admin
-const getUserById = async(req, res) => {
-    try {
-        const user = await User.findByPk(req.params.id, {
-            attributes: { exclude: ["password"] },
-            include: [{
-                model: Order,
-                include: [OrderItem],
-            }, ],
-        });
+/**
+ * Update book (Admin only)
+ * @route PUT /api/admin/books/:id
+ * @access Private/Admin
+ */
+exports.updateBook = async (req, res) => {
+  try {
+    const updateData = req.body;
 
-        if (!user) {
-            return res
-                .status(404)
-                .json(formatResponse(false, null, "User not found"));
-        }
-
-        res.json(formatResponse(true, user, "User retrieved successfully"));
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(formatResponse(false, null, "Server error"));
+    // Handle file upload if present
+    if (req.file) {
+      updateData.coverImage = `/uploads/${req.file.filename}`;
     }
+
+    const book = await adminService.updateBook(req.params.id, updateData);
+    res.json({
+      success: true,
+      message: "Book updated successfully",
+      data: book,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
-// @desc    Update user (Admin)
-// @route   PUT /api/admin/users/:id
-// @access  Private/Admin
-const updateUser = async(req, res) => {
-    try {
-        const user = await User.findByPk(req.params.id);
-
-        if (!user) {
-            return res
-                .status(404)
-                .json(formatResponse(false, null, "User not found"));
-        }
-
-        const { name, email, role, isActive } = req.body;
-
-        // Check if email is being changed and already exists
-        if (email && email !== user.email) {
-            const emailExists = await User.findOne({ where: { email } });
-            if (emailExists) {
-                return res
-                    .status(400)
-                    .json(formatResponse(false, null, "Email already in use"));
-            }
-        }
-
-        await user.update({
-            name: name || user.name,
-            email: email || user.email,
-            role: role || user.role,
-            isActive: isActive !== undefined ? isActive : user.isActive,
-        });
-
-        // Get updated user without password
-        const updatedUser = await User.findByPk(req.params.id, {
-            attributes: { exclude: ["password"] },
-        });
-
-        res.json(formatResponse(true, updatedUser, "User updated successfully"));
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(formatResponse(false, null, "Server error"));
-    }
+/**
+ * Delete book (Admin only)
+ * @route DELETE /api/admin/books/:id
+ * @access Private/Admin
+ */
+exports.deleteBook = async (req, res) => {
+  try {
+    const result = await adminService.deleteBook(req.params.id);
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
-// @desc    Delete user
-// @route   DELETE /api/admin/users/:id
-// @access  Private/Admin
-const deleteUser = async(req, res) => {
-    try {
-        const user = await User.findByPk(req.params.id);
-
-        if (!user) {
-            return res
-                .status(404)
-                .json(formatResponse(false, null, "User not found"));
-        }
-
-        // Prevent deleting self
-        if (user.id === req.user.id) {
-            return res
-                .status(400)
-                .json(formatResponse(false, null, "Cannot delete your own account"));
-        }
-
-        await user.destroy();
-
-        res.json(formatResponse(true, null, "User deleted successfully"));
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(formatResponse(false, null, "Server error"));
-    }
+/**
+ * Update book stock (Admin only)
+ * @route PATCH /api/admin/books/:id/stock
+ * @access Private/Admin
+ */
+exports.updateStock = async (req, res) => {
+  try {
+    const { quantity, action } = req.body;
+    const result = await adminService.updateStock(
+      req.params.id,
+      quantity,
+      action
+    );
+    res.json({
+      success: true,
+      message: `Stock updated to ${result.stock}`,
+      data: result,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
-// @desc    Get dashboard stats
-// @route   GET /api/admin/dashboard
-// @access  Private/Admin
-const getDashboardStats = async(req, res) => {
-    try {
-        // Get counts
-        const totalUsers = await User.count();
-        const totalBooks = await Book.count();
-        const totalOrders = await Order.count();
-        const totalCategories = await Category.count();
+// ==================== CATEGORY MANAGEMENT ====================
 
-        // Get recent orders
-        const recentOrders = await Order.findAll({
-            limit: 10,
-            include: [User],
-            order: [
-                ["createdAt", "DESC"]
-            ],
-        });
-
-        // Get low stock books
-        const lowStockBooks = await Book.findAll({
-            where: {
-                stock: {
-                    [require("sequelize").Op.lt]: 10, // Less than 10
-                },
-            },
-            limit: 10,
-            order: [
-                ["stock", "ASC"]
-            ],
-        });
-
-        // Calculate total revenue
-        const revenueResult = await Order.findOne({
-            attributes: [
-                [
-                    require("sequelize").fn(
-                        "SUM",
-                        require("sequelize").col("totalAmount")
-                    ),
-                    "totalRevenue",
-                ],
-            ],
-            where: {
-                paymentStatus: "paid",
-            },
-        });
-
-        const totalRevenue = revenueResult?.dataValues?.totalRevenue || 0;
-
-        res.json(
-            formatResponse(
-                true, {
-                    counts: {
-                        totalUsers,
-                        totalBooks,
-                        totalOrders,
-                        totalCategories,
-                        totalRevenue: parseFloat(totalRevenue),
-                    },
-                    recentOrders,
-                    lowStockBooks,
-                },
-                "Dashboard stats retrieved successfully"
-            )
-        );
-    } catch (error) {
-        console.error(error);
-        res.status(500).json(formatResponse(false, null, "Server error"));
-    }
+/**
+ * Add new category (Admin only)
+ * @route POST /api/admin/categories
+ * @access Private/Admin
+ */
+exports.addCategory = async (req, res) => {
+  try {
+    const category = await adminService.addCategory(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Category added successfully",
+      data: category,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
-module.exports = {
-    getAllUsers,
-    getUserById,
-    updateUser,
-    deleteUser,
-    getDashboardStats,
+/**
+ * Update category (Admin only)
+ * @route PUT /api/admin/categories/:id
+ * @access Private/Admin
+ */
+exports.updateCategory = async (req, res) => {
+  try {
+    const category = await adminService.updateCategory(req.params.id, req.body);
+    res.json({
+      success: true,
+      message: "Category updated successfully",
+      data: category,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Delete category (Admin only)
+ * @route DELETE /api/admin/categories/:id
+ * @access Private/Admin
+ */
+exports.deleteCategory = async (req, res) => {
+  try {
+    const result = await adminService.deleteCategory(req.params.id);
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// ==================== ORDER MANAGEMENT ====================
+
+/**
+ * Get all orders (Admin only)
+ * @route GET /api/admin/orders
+ * @access Private/Admin
+ */
+exports.getAllOrders = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const result = await adminService.getAllOrders(page, limit);
+    res.json({
+      success: true,
+      count: result.count,
+      pagination: result.pagination,
+      data: result.orders,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch orders",
+    });
+  }
+};
+
+/**
+ * Update order status (Admin only)
+ * @route PUT /api/admin/orders/:id/status
+ * @access Private/Admin
+ */
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const order = await adminService.updateOrderStatus(req.params.id, status);
+    res.json({
+      success: true,
+      message: `Order status updated to ${status}`,
+      data: order,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// ==================== USER MANAGEMENT ====================
+
+/**
+ * Get all users (Admin only)
+ * @route GET /api/admin/users
+ * @access Private/Admin
+ */
+exports.getAllUsers = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const result = await adminService.getAllUsers(page, limit);
+    res.json({
+      success: true,
+      count: result.count,
+      pagination: result.pagination,
+      data: result.users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch users",
+    });
+  }
+};
+
+/**
+ * Update user (Admin only)
+ * @route PUT /api/admin/users/:id
+ * @access Private/Admin
+ */
+exports.updateUser = async (req, res) => {
+  try {
+    const user = await adminService.updateUser(req.params.id, req.body);
+    res.json({
+      success: true,
+      message: "User updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    const status = error.message.includes("not found") ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// ==================== DASHBOARD STATS ====================
+
+/**
+ * Get admin dashboard statistics
+ * @route GET /api/admin/dashboard
+ * @access Private/Admin
+ */
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const stats = await adminService.getDashboardStats();
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch dashboard statistics",
+    });
+  }
 };
